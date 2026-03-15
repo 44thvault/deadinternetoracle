@@ -247,7 +247,7 @@ export async function GET(request: NextRequest) {
       try {
         const parsed = new URL(originalUrl.startsWith('http') ? originalUrl : `http://${originalUrl}`);
         source = parsed.host + parsed.pathname;
-      } catch {
+      } catch (_e) {
         // Keep original
       }
 
