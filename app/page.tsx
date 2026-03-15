@@ -112,7 +112,9 @@ export default function OraclePage() {
     setErrorMsg('');
 
     try {
-      const res = await fetch('/api/oracle');
+      const res = await fetch('/api/oracle', {
+        signal: AbortSignal.timeout(12000),
+      });
 
       if (res.status === 429) {
         const data = await res.json();

@@ -185,19 +185,27 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  // Try to fetch from Wayback Machine
-  const MAX_RETRIES = 5;
+  // Hard deadline — Vercel free tier kills at 10s, so we bail at 8s
+  const DEADLINE = Date.now() + 8000;
+  const MAX_RETRIES = 3;
+
+  function timeLeft() { return Math.max(0, DEADLINE - Date.now()); }
 
   for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+    if (timeLeft() < 1500) break; // not enough time for another attempt
+
     try {
       const domain = getRandomElement(DEAD_DOMAINS);
       const year = 1996 + Math.floor(Math.random() * 9); // 1996-2004
 
-      // Query CDX API
-      const cdxUrl = `https://web.archive.org/cdx/search/cdx?url=${domain}/*&output=json&limit=50&from=${year}0101&to=${year}1231&filter=mimetype:text/html&fl=original,timestamp`;
+      // Query CDX API — tight timeout
+      const cdxUrl = `https://web.archive.org/cdx/search/cdx?url=${domain}/*&output=json&limit=25&from=${year}0101&to=${year}1231&filter=mimetype:text/html&fl=original,timestamp`;
+
+      const cdxTimeout = Math.min(3000, timeLeft() - 500);
+      if (cdxTimeout < 500) break;
 
       const cdxResponse = await fetch(cdxUrl, {
-        signal: AbortSignal.timeout(10000),
+        signal: AbortSignal.timeout(cdxTimeout),
         headers: { 'User-Agent': 'DeadInternetOracle/1.0 (research; digital-archaeology)' },
       });
 
@@ -213,10 +221,13 @@ export async function GET(request: NextRequest) {
       const pick = getRandomElement(results);
       const [originalUrl, timestamp] = pick;
 
-      // Fetch the archived page
-      const archiveUrl = `https://web.archive.org/web/${timestamp}/${originalUrl}`;
+      // Fetch the archived page — tight timeout
+      const pageTimeout = Math.min(3500, timeLeft() - 500);
+      if (pageTimeout < 500) break;
+
+      const archiveUrl = `https://web.archive.org/web/${timestamp}id_/${originalUrl}`;
       const pageResponse = await fetch(archiveUrl, {
-        signal: AbortSignal.timeout(12000),
+        signal: AbortSignal.timeout(pageTimeout),
         headers: { 'User-Agent': 'DeadInternetOracle/1.0 (research; digital-archaeology)' },
       });
 
@@ -255,7 +266,7 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  // All retries failed — serve fallback
+  // All retries failed or deadline approaching — serve fallback
   const fallback = getRandomElement(FALLBACK_TRANSMISSIONS);
 
   return NextResponse.json({
