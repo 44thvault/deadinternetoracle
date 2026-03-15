@@ -27,7 +27,7 @@ function formatTimestamp(ts: string): string {
 
 function corruptText(text: string, decayIndex: number): Array<string | { char: string; glitch: boolean }> {
   if (!text) return [];
-  const corruptionRate = (decayIndex / 100) * 0.12;
+  const corruptionRate = (decayIndex / 100) * 0.03;
   return text.split('').map(function(char): string | { char: string; glitch: boolean } {
     if (char === ' ' || char === '\n') return char;
     if (Math.random() < corruptionRate) {
